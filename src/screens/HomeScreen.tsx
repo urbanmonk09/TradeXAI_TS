@@ -39,8 +39,8 @@ interface StockDisplay {
 }
 
 const defaultSymbols = [
-  "NSE:NIFTY50",
-  "NSE:BANKNIFTY",
+  "^NSEI",
+  "^NSEBANK",
   "RELIANCE.NS",
   "TCS.NS",
   "INFY.NS",

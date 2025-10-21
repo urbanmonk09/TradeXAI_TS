@@ -1,13 +1,12 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import StackNavigator from "./src/navigation/StackNavigator";
+import StackNavigator from "./components/navigation/StackNavigator
 
-const App: React.FC = () => {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <NavigationContainer>
+      {children}
       <StackNavigator />
     </NavigationContainer>
   );
-};
-
-export default App;
+}

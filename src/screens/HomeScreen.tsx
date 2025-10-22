@@ -29,12 +29,12 @@ interface StockDisplay {
   targets: number[];
   confidence: number;
   hitStatus: "ACTIVE" | "TARGET ✅" | "STOP ❌";
-  explanation: string; // always string, not optional
+  explanation: string;
   entry?: number;
   finalPrice?: number;
   resolved?: boolean;
   resolvedAt?: string;
-  price: number; // live price
+  price: number;
   justUpdated?: boolean;
 }
 
@@ -85,19 +85,20 @@ const HomeScreen: React.FC = () => {
         prev.map((s) => {
           if (s.symbol !== symbol) return s;
 
-          const updatedSignal: SignalResult = {
-            signal: s.signal,
-            stoploss: s.stoploss,
-            targets: s.targets,
-            confidence: s.confidence,
-            hitStatus: s.hitStatus,
-            explanation: s.explanation,
-            entryPrice: s.entry,
-            resolved: s.resolved,
-            finalPrice: s.finalPrice,
-          };
-
-          const newStatus = updateHitStatus(updatedSignal, data.current);
+          const newStatus = updateHitStatus(
+            {
+              signal: s.signal,
+              stoploss: s.stoploss,
+              targets: s.targets,
+              confidence: s.confidence,
+              hitStatus: s.hitStatus,
+              explanation: s.explanation,
+              entryPrice: s.entry,
+              resolved: s.resolved,
+              finalPrice: s.finalPrice,
+            },
+            data.current
+          );
 
           return {
             ...s,
@@ -105,37 +106,11 @@ const HomeScreen: React.FC = () => {
             hitStatus: newStatus.hitStatus,
             resolved: newStatus.resolved,
             finalPrice: newStatus.finalPrice,
-            explanation: newStatus.explanation || "", // force string
+            explanation: newStatus.explanation || "",
             justUpdated: true,
           };
         })
       );
-
-      const trades = await loadTradeHistory();
-      const existingTrade = trades.find((t) => t.symbol === symbol);
-      if (existingTrade) {
-        const updatedTrade: TradeResult = {
-          ...existingTrade,
-          hitStatus: updateHitStatus(
-            {
-              signal: existingTrade.signal,
-              stoploss: existingTrade.stoploss,
-              targets: existingTrade.targets,
-              confidence: existingTrade.confidence,
-              hitStatus: existingTrade.hitStatus,
-              explanation: existingTrade.explanation || "",
-              entryPrice: existingTrade.entry,
-              resolved: existingTrade.resolved,
-              finalPrice: existingTrade.finalPrice,
-            },
-            data.current
-          ).hitStatus,
-        };
-
-        const updatedTrades = trades.map((t) => (t.symbol === symbol ? updatedTrade : t));
-        await saveTradeHistory(updatedTrades);
-        refreshAccuracy();
-      }
 
       setTimeout(() => {
         setStockData((prev) => prev.map((s) => ({ ...s, justUpdated: false })));
@@ -152,8 +127,8 @@ const HomeScreen: React.FC = () => {
     for (const s of symbols) {
       try {
         const data = await fetchStockData(s);
-        const smc: SignalResult = generateSMCSignal(data);
-        const trade: TradeResult = signalToTradeResult(smc, s);
+        const smc = generateSMCSignal(data);
+        const trade = signalToTradeResult(smc, s);
 
         const trades = await loadTradeHistory();
         const updatedTrades = [...trades.filter((t) => t.symbol !== s), trade];
@@ -162,7 +137,7 @@ const HomeScreen: React.FC = () => {
         out.push({
           ...trade,
           price: data.current,
-          explanation: trade.explanation || "", // force string
+          explanation: trade.explanation || "",
           justUpdated: false,
         });
       } catch (e) {
@@ -178,8 +153,7 @@ const HomeScreen: React.FC = () => {
 
   const refreshAccuracy = async () => {
     const trades = await loadTradeHistory();
-    const acc = computeAccuracy(trades);
-    setAccuracy(acc);
+    setAccuracy(computeAccuracy(trades));
   };
 
   const refreshPrices = async () => {
@@ -189,18 +163,20 @@ const HomeScreen: React.FC = () => {
     for (const stock of stockData) {
       try {
         const data = await fetchStockData(stock.symbol);
-        const updatedSignal: SignalResult = {
-          signal: stock.signal,
-          stoploss: stock.stoploss,
-          targets: stock.targets,
-          confidence: stock.confidence,
-          hitStatus: stock.hitStatus,
-          explanation: stock.explanation,
-          entryPrice: stock.entry,
-          resolved: stock.resolved,
-          finalPrice: stock.finalPrice,
-        };
-        const newHit = updateHitStatus(updatedSignal, data.current);
+        const newHit = updateHitStatus(
+          {
+            signal: stock.signal,
+            stoploss: stock.stoploss,
+            targets: stock.targets,
+            confidence: stock.confidence,
+            hitStatus: stock.hitStatus,
+            explanation: stock.explanation,
+            entryPrice: stock.entry,
+            resolved: stock.resolved,
+            finalPrice: stock.finalPrice,
+          },
+          data.current
+        );
 
         updated.push({
           ...stock,
@@ -208,26 +184,9 @@ const HomeScreen: React.FC = () => {
           hitStatus: newHit.hitStatus,
           resolved: newHit.resolved,
           finalPrice: newHit.finalPrice,
-          explanation: newHit.explanation || "", // force string
+          explanation: newHit.explanation || "",
           justUpdated: true,
         });
-
-        const trades = await loadTradeHistory();
-        const existingTrade = trades.find((t) => t.symbol === stock.symbol);
-        if (existingTrade) {
-          const updatedTrades = trades.map((t) =>
-            t.symbol === stock.symbol
-              ? {
-                  ...existingTrade,
-                  hitStatus: newHit.hitStatus,
-                  resolved: newHit.resolved,
-                  finalPrice: newHit.finalPrice,
-                  explanation: newHit.explanation || "",
-                }
-              : t
-          );
-          await saveTradeHistory(updatedTrades);
-        }
       } catch (e) {
         console.warn("Error refreshing", stock.symbol, e);
         updated.push(stock);
@@ -241,13 +200,18 @@ const HomeScreen: React.FC = () => {
 
   const handleSearch = () => {
     const q = search.trim().toLowerCase();
-    if (!q) {
-      setSearchResults([]);
-      return;
-    }
-    const filtered = stockData.filter((st) => st.symbol.toLowerCase().includes(q));
-    setSearchResults(filtered);
+    if (!q) return setSearchResults([]);
+    setSearchResults(stockData.filter((st) => st.symbol.toLowerCase().includes(q)));
   };
+
+  // Categorize results
+  const indexes = stockData.filter((s) => s.symbol.startsWith("^"));
+  const cryptos = stockData.filter((s) => s.symbol.includes("/USD"));
+  const stocks = stockData.filter(
+    (s) => !s.symbol.startsWith("^") && !s.symbol.includes("/USD")
+  );
+
+  const visibleData = searchResults.length ? searchResults : stockData;
 
   return (
     <View style={styles.container}>
@@ -269,24 +233,34 @@ const HomeScreen: React.FC = () => {
       {loading ? (
         <ActivityIndicator size="large" />
       ) : (
-        <ScrollView>
-          <Text style={styles.title}>🔥 Market Scanner</Text>
-          {stockData.slice(0, 3).map((s) => (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Text style={styles.title}>📊 Indexes</Text>
+          {indexes.map((s) => (
             <StockCard
               key={s.symbol}
               {...s}
               onPress={() => nav.navigate("Signal", { stock: s })}
-              style={s.justUpdated ? { borderWidth: 2, borderColor: "#0a8", borderRadius: 12 } : undefined}
+              style={s.justUpdated ? styles.updatedCard : undefined}
             />
           ))}
 
-          <Text style={styles.title}>📈 Market Watch</Text>
-          {(searchResults.length ? searchResults : stockData.slice(3)).map((s) => (
+          <Text style={styles.title}>🏦 Stocks</Text>
+          {stocks.map((s) => (
             <StockCard
               key={s.symbol}
               {...s}
               onPress={() => nav.navigate("Signal", { stock: s })}
-              style={s.justUpdated ? { borderWidth: 2, borderColor: "#0a8", borderRadius: 12 } : undefined}
+              style={s.justUpdated ? styles.updatedCard : undefined}
+            />
+          ))}
+
+          <Text style={styles.title}>💎 Crypto</Text>
+          {cryptos.map((s) => (
+            <StockCard
+              key={s.symbol}
+              {...s}
+              onPress={() => nav.navigate("Signal", { stock: s })}
+              style={s.justUpdated ? styles.updatedCard : undefined}
             />
           ))}
         </ScrollView>
@@ -306,6 +280,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: "700", marginVertical: 12 },
   accuracyText: { fontSize: 16, fontWeight: "600", color: "#007b00" },
+  updatedCard: { borderWidth: 2, borderColor: "#0a8", borderRadius: 12 },
 });
 
 export default HomeScreen;

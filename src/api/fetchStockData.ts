@@ -25,13 +25,14 @@ function normalizeSymbol(
 ): { kind: "stock" | "crypto" | "index"; code: string; key: string } {
   const s = input.trim().toUpperCase();
 
-  // ✅ Use correct Yahoo Finance symbols for indices (no .NS)
-  if (["NIFTY", "NIFTY50", "NSE:NIFTY50"].includes(s))
+  // ✅ Indices (no .NS!)
+  if (["^NSEI", "NIFTY", "NIFTY50", "NSE:NIFTY50"].includes(s))
     return { kind: "index", code: "^NSEI", key: "NIFTY" };
 
-  if (["BANKNIFTY", "NSE:BANKNIFTY"].includes(s))
+  if (["^NSEBANK", "BANKNIFTY", "NSE:BANKNIFTY"].includes(s))
     return { kind: "index", code: "^NSEBANK", key: "BANKNIFTY" };
 
+  // ✅ Crypto (Binance)
   if (["BTC/USD", "BTCUSDT", "BTC-USD"].includes(s))
     return { kind: "crypto", code: "BTCUSDT", key: "BTC/USD" };
 
@@ -41,6 +42,10 @@ function normalizeSymbol(
   if (["SOL/USD", "SOLUSDT", "SOL-USD"].includes(s))
     return { kind: "crypto", code: "SOLUSDT", key: "SOL/USD" };
 
+  // ✅ If already Yahoo-compatible (starts with ^), keep as is
+  if (s.startsWith("^")) return { kind: "index", code: s, key: s };
+
+  // ✅ Regular NSE stock
   const code = s.endsWith(".NS") ? s : `${s}.NS`;
   return { kind: "stock", code, key: code };
 }
